@@ -1,9 +1,6 @@
 import * as d3 from 'd3';
 import { DatasetType, HierarchyNodeWithData } from './types';
 
-// Define HierarchyNode type based on your data structure
-type HierarchyNode = d3.HierarchyNode<DatasetType>;
-
 export class ZoomableSunburst {
 	private width: number;
 	private height: number;
@@ -12,6 +9,7 @@ export class ZoomableSunburst {
 	private color: d3.ScaleOrdinal<string, string>;
 	private arc: d3.Arc<any, any>;
 	private data: DatasetType;
+	private format = d3.format(",d"); // Move format here for reuse
 	// Initialize properties that will be defined in initialize()
 	private root!: HierarchyNodeWithData;
 	private path!: d3.Selection<Element, HierarchyNodeWithData, any, any>;
@@ -51,8 +49,11 @@ export class ZoomableSunburst {
 	private initialize(): void {
 		// Compute the layout
 		const hierarchy = d3.hierarchy(this.data)
-			.sum(d => (d as any).value || 0)
-			.sort((a, b) => ((b as any).value || 0) - ((a as any).value || 0));
+			.sum(d => {
+				// Ensure value is properly calculated for all nodes
+				return typeof (d as any).value === "number" ? (d as any).value : 0;
+			})
+			.sort((a, b) => (b.value || 0) - (a.value || 0));
 
 		// Cast the result of partition to HierarchyNodeWithData
 		this.root = d3.partition<DatasetType>()
@@ -74,6 +75,7 @@ export class ZoomableSunburst {
 			.data(this.root.descendants().slice(1))
 			.join("path")
 			.attr("fill", d => {
+				// Find the top-level ancestor to determine color
 				let node = d;
 				while (node.depth > 1) {
 					node = node.parent!;
@@ -89,10 +91,12 @@ export class ZoomableSunburst {
 			.style("cursor", "pointer")
 			.on("click", (event: MouseEvent, d: HierarchyNodeWithData) => this.clicked(event, d));
 
-		// Append titles for accessibility
-		const format = d3.format(",d");
+		// Append titles for accessibility and tooltips
 		this.path.append("title")
-			.text(d => `${d.ancestors().map(d => d.data.name).reverse().join("/")}\n${format(d.value ?? 0)}`);
+			.text(d => {
+				const ancestorNames = d.ancestors().map(d => d.data.name).reverse().join("/");
+				return `${ancestorNames}\n${this.format(d.value || 0)}`;
+			});
 
 		// Append the labels
 		this.label = this.svg.append("g")
@@ -117,8 +121,10 @@ export class ZoomableSunburst {
 	}
 
 	private clicked(event: MouseEvent, p: HierarchyNodeWithData): void {
+		// Update parent to clicked node's parent, or root if clicking center
 		this.parent.datum(p.parent || this.root);
 
+		// Calculate new target positions for all nodes
 		this.root.each(d => {
 			d.target = {
 				x0: Math.max(0, Math.min(1, (d.x0 - p.x0) / (p.x1 - p.x0))) * 2 * Math.PI,
@@ -128,49 +134,62 @@ export class ZoomableSunburst {
 			};
 		});
 
+		// Create transition with appropriate duration
 		const t = this.svg.transition().duration(event.altKey ? 7500 : 750);
 
-		// Transition the data on all arcs
+		// Transition the data on all arcs, even the ones that aren't visible,
+		// so that if this transition is interrupted, entering arcs will start
+		// the next transition from the desired position.
 		this.path.transition(t as any)
 			.tween("data", d => {
 				const i = d3.interpolate(d.current, d.target!);
 				return (t: number) => d.current = i(t);
-			})
+			});
+
+		// Update fill-opacity and pointer-events during transition
+		this.path.transition(t as any)
 			.filter(function (d) {
-				// Use 'this' bound to the SVG element and our object method
-				return !!(+this.getAttribute("fill-opacity")!);
+				// Include arcs that are either currently visible or will be visible
+				return !!(+this.getAttribute("fill-opacity")! || (d.target && d.target.y1 <= 3 && d.target.y0 >= 1));
 			})
 			.attr("fill-opacity", d => this.arcVisible(d.target!) ? (d.children ? 0.6 : 0.4) : 0)
-			.attr("pointer-events", d => this.arcVisible(d.target!) ? "auto" : "none")
-			.attrTween("d", (d) => {
+			.attr("pointer-events", d => this.arcVisible(d.target!) ? "auto" : "none");
+
+		// Update the arc paths during transition
+		this.path.transition(t as any)
+			.attrTween("d", d => {
 				const interpolate = d3.interpolate(d.current, d.target!);
-				// Use an arrow function to preserve 'this'
 				return (t: number) => {
 					const interpolated = interpolate(t);
-					// Call the arc generator with the interpolated data
-					return (this.arc(interpolated) ?? "") as string;
+					return this.arc(interpolated) || "";
 				};
 			});
 
 		// Transition the labels
-		this.label.filter(function (d) {
-			// Use 'this' bound to the SVG element and our object method
-			return !!(+this.getAttribute("fill-opacity")!);
-		})
-			.transition(t as any)
+		this.label.transition(t as any)
+			.filter(function (d) {
+				// Include labels that are either currently visible or will be visible
+				return !!(+this.getAttribute("fill-opacity")! || (d.target && d.target.y1 <= 3 && d.target.y0 >= 1));
+			})
 			.attr("fill-opacity", d => +this.labelVisible(d.target!))
-			.attrTween("transform", d => () => this.labelTransform(d.current));
+			.attrTween("transform", d => {
+				const interpolate = d3.interpolate(d.current, d.target!);
+				return (t: number) => this.labelTransform(interpolate(t));
+			});
 	}
 
 	private arcVisible(d: { y0: number, y1: number, x0: number, x1: number }): boolean {
+		// An arc is visible if it's within the view boundaries and has a non-zero angle
 		return d.y1 <= 3 && d.y0 >= 1 && d.x1 > d.x0;
 	}
 
 	private labelVisible(d: { y0: number, y1: number, x0: number, x1: number }): boolean {
+		// A label is visible if it's within the view boundaries and the arc is large enough to fit text
 		return d.y1 <= 3 && d.y0 >= 1 && (d.y1 - d.y0) * (d.x1 - d.x0) > 0.03;
 	}
 
 	private labelTransform(d: { y0: number, y1: number, x0: number, x1: number }): string {
+		// Calculate the position and rotation for the label
 		const x = (d.x0 + d.x1) / 2 * 180 / Math.PI;
 		const y = (d.y0 + d.y1) / 2 * this.radius;
 		return `rotate(${x - 90}) translate(${y},0) rotate(${x < 180 ? 0 : 180})`;

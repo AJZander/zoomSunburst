@@ -1,0 +1,14 @@
+{
+  "name": "99a67ee7d37297dd",
+  "main": "99a67ee7d37297dd@380.js",
+  "version": "380.0.0",
+  "homepage": "https://observablehq.com/d/99a67ee7d37297dd",
+  "author": {
+    "name": "Mygene",
+    "url": "https://observablehq.com/@mygene"
+  },
+  "type": "module",
+  "peerDependencies": {
+    "@observablehq/runtime": "4 - 5"
+  }
+}

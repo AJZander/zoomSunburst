@@ -1,33 +1,96 @@
-# Zoomable sunburst
+# Zoomable Sunburst Visualization
 
-https://observablehq.com/d/99a67ee7d37297dd@380
+This is a TypeScript implementation of the D3.js Zoomable Sunburst Visualization, converted from an Observable notebook.
 
-View this notebook in your browser by running a web server in this folder. For
-example:
+## Features
 
-~~~sh
-npx http-server
-~~~
+- Interactive zoomable sunburst diagram
+- Smooth transitions between hierarchy levels
+- Responsive design that works on various screen sizes
+- Built with TypeScript for improved type safety and code quality
 
-Or, use the [Observable Runtime](https://github.com/observablehq/runtime) to
-import this module directly into your application. To npm install:
+## Prerequisites
 
-~~~sh
-npm install @observablehq/runtime@5
-npm install https://api.observablehq.com/d/99a67ee7d37297dd@380.tgz?v=3
-~~~
+- Node.js (v14 or later)
+- npm or yarn
+- Docker (optional, for containerized deployment)
 
-Then, import your notebook and the runtime as:
+## Local Development
 
-~~~js
-import {Runtime, Inspector} from "@observablehq/runtime";
-import define from "99a67ee7d37297dd";
-~~~
+1. Clone the repository:
 
-To log the value of the cell named “foo”:
+```bash
+git clone <repository-url>
+cd zoomable-sunburst
+```
 
-~~~js
-const runtime = new Runtime();
-const main = runtime.module(define);
-main.value("foo").then(value => console.log(value));
-~~~
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Start the development server:
+
+```bash
+npm start
+```
+
+This will start a development server at http://localhost:3000 with hot reloading enabled.
+
+## Building for Production
+
+To build the application for production:
+
+```bash
+npm run build
+```
+
+This will create optimized production files in the `dist` directory.
+
+## Running with Docker
+
+You can easily build and run the application using Docker:
+
+1. Build the Docker image:
+
+```bash
+docker build -t zoomable-sunburst .
+```
+
+2. Run the Docker container:
+
+```bash
+docker run -p 8080:80 zoomable-sunburst
+```
+
+3. Open your browser and navigate to http://localhost:8080
+
+## Project Structure
+
+- `src/` - TypeScript source code
+  - `index.ts` - Entry point for the application
+  - `sunburst.ts` - Main Sunburst visualization implementation
+  - `types.ts` - TypeScript type definitions
+- `public/` - Static assets
+  - `index.html` - HTML template
+  - `style.css` - CSS styles
+  - `flare-2.json` - Hierarchical data used for the visualization
+
+## How to Use the Visualization
+
+The Zoomable Sunburst diagram shows a hierarchical data structure where:
+
+- Each arc represents a node in the hierarchy
+- The center circle represents the root
+- Only two levels of the hierarchy are visible at once
+- Click on any arc to zoom in and focus on that part of the hierarchy
+- Click on the center circle to zoom out one level
+
+## License
+
+This project is based on [D3.js](https://d3js.org/) examples, which are distributed under the [ISC License](https://opensource.org/licenses/ISC).
+
+## Acknowledgements
+
+The original visualization was created by [Observable](https://observablehq.com/) and is based on [D3.js](https://d3js.org/).
